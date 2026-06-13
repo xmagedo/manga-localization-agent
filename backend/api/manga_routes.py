@@ -71,13 +71,12 @@
 
 
 # backend/api/manga_routes.py
-from backend.utils.model_loader import get_model_version
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from pathlib import Path
 from typing import Optional
 import os, csv, json, traceback, datetime
 
-from backend.services.detection_service import detect_bubbles_and_panels
+from backend.services.localize import localize
 from backend.services.mlflow_utils import ensure_mlflow_ready, log_inference_run
 
 router = APIRouter()
@@ -114,29 +113,25 @@ async def run_inference(
         image_path.write_bytes(await file.read())
         log_path.write_text(f"[{ts}] Saved upload to {image_path}\n")
 
-        # 2) Run detection (returns results, overlay_path)
-        results, overlay_path = detect_bubbles_and_panels(str(image_path), log_path=str(log_path))
-
-        # 3) Get model version once
-        model_version = get_model_version()
-
-        # 4) Write JSON atomically
-        tmp = json_path.with_suffix(".json.tmp")
-        tmp.write_text(
-            json.dumps(
-                {"results": results, "model_version": model_version},
-                indent=4,
-                ensure_ascii=False
-            ),
-            encoding="utf-8"
+        # 2-4) Run the consolidated pipeline: detection -> OCR -> JP->AR
+        #       translation, plus the JSON + per-run CSV outputs. This is the
+        #       same work the endpoint used to do inline, now behind localize().
+        result = localize(
+            str(image_path),
+            target_lang="ar",
+            output_dir=OUTPUT_DIR,
+            log_path=log_path,
         )
-        tmp.replace(json_path)
+        results       = result.results
+        model_version = result.model_version
+        overlay_path  = result.overlay_path
+        json_path     = Path(result.json_path)
+        csv_path      = Path(result.csv_path)
+        panel_count   = result.panel_count
+        bubble_count  = result.bubble_count
+        text_count    = result.text_count
 
         # 5) Append production.csv (summary of this run)
-        panel_count  = len(results.get("panels", []))
-        bubble_count = len(results.get("bubbles", []))
-        text_count   = sum(1 for b in results.get("bubbles", []) if b.get("japanese_text"))
-
         new_file = not PROD_CSV.exists()
         with PROD_CSV.open("a", newline="", encoding="utf-8") as f:
             w = csv.writer(f)
@@ -152,16 +147,7 @@ async def run_inference(
                 bubble_ground_truth if bubble_ground_truth is not None else ""
             ])
 
-        # 6) Per-run CSV (detailed bubble info)
-        with csv_path.open("w", newline="", encoding="utf-8") as f:
-            w = csv.writer(f)
-            w.writerow(["bubble_no","panel_no","japanese_text","arabic_text","x1","y1","x2","y2"])
-            for b in results.get("bubbles", []):
-                c = b["coordinates"]
-                w.writerow([
-                    b["bubble_no"], b["panel_no"], b["japanese_text"], b["arabic_text"],
-                    c["x1"], c["y1"], c["x2"], c["y2"]
-                ])
+        # 6) (JSON + per-run CSV are written inside localize() above.)
 
         # 7) MLflow (best-effort; won’t block)
         try:
