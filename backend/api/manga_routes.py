@@ -170,7 +170,9 @@ async def run_inference(
             with open(log_path, "a") as lf:
                 lf.write(f"[MLflow] {e}\n")
 
-        # 8) Return file locations + inline detection results
+        # 8) Return file locations + inline detection results.
+        #    (Existing keys are unchanged; Option B overlay-package keys are
+        #     added on top so existing clients keep working.)
         return {
             "ok": True,
             "results": results,
@@ -178,6 +180,9 @@ async def run_inference(
             "csv_path": str(csv_path),
             "overlay_path": str(overlay_path),
             "log_path": str(log_path),
+            "clean_image_path": result.clean_image_path,
+            "overlay_json_path": result.overlay_json_path,
+            "manifest": result.manifest,
         }
 
     except Exception:
