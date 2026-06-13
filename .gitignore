@@ -1,0 +1,64 @@
+# ---------- secrets / credentials ----------
+.env
+*.env
+!.env.example
+*.pem
+*.key
+.aws/
+
+# ---------- python ----------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# ---------- os / editor ----------
+.DS_Store
+.claude/
+
+# ---------- virtualenvs ----------
+venv/
+.venv/
+env/
+
+# ---------- model weights (never commit) ----------
+*.pt
+*.pth
+*.onnx
+*.safetensors
+models/
+backend/models/
+backend/backend/
+
+# ---------- manga pages / generated outputs / logs ----------
+backend/data/
+backend/logs/
+data/
+outputs/
+# copyrighted page scans — keep all raster images out by default.
+# (whitelist specific assets later, e.g. an Arabic font is .ttf/.otf and is NOT ignored)
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.gif
+
+# ---------- MLOps / experiment tracking (out of scope for this repo) ----------
+mlruns/
+mlruns_backup/
+mlops/
+.metaflow/
+
+# ---------- infra / out of scope ----------
+cloud-formation/
+frontend/
+node_modules/
+dist/
+build/
+
+# ---------- junk / backups ----------
+backup_before_cleanup.patch
+*.patch
+=*

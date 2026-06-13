@@ -1,0 +1,83 @@
+# --- web / API ---
+fastapi==0.115.12
+uvicorn==0.34.1
+python-multipart==0.0.20
+python-dotenv==1.1.0
+starlette==0.46.2
+pydantic==2.11.3
+loguru==0.7.3
+requests==2.32.3
+anyio==4.9.0
+h11==0.14.0
+sniffio==1.3.1
+
+# --- core scientific stack (CPU wheels available) ---
+# Pin numpy to 1.26.x so SciPy wheels are available on slim; Pandas works fine with it.
+numpy==1.26.4
+scipy==1.11.4
+pandas==2.2.3
+
+# --- vision & OCR ---
+# Keep ONLY headless OpenCV in containers (conflicts if you also install opencv-python).
+opencv-python-headless==4.10.0.84
+pillow==11.2.1
+pillow_heif==0.22.0
+
+# --- PyTorch CPU (versions with manylinux wheels for Py3.10) ---
+torch==2.4.1
+torchvision==0.19.1
+
+# --- transformers / OCR helpers ---
+transformers==4.51.3
+manga-ocr==0.1.14
+fugashi==1.4.0
+unidic-lite==1.0.8
+jaconv==0.4.0
+safetensors==0.5.3
+regex==2024.11.6
+tqdm==4.67.1
+filetype==1.2.0
+fire==0.7.0
+huggingface-hub==0.30.2
+typing_extensions==4.13.2
+
+# --- optional libs you had (kept if you need them) ---
+matplotlib==3.9.4
+seaborn==0.13.2
+openpyxl==3.1.5
+psutil==7.0.0
+py-cpuinfo==9.0.0
+PyYAML==6.0.2
+packaging==24.2
+idna==3.7
+charset-normalizer==3.4.1
+urllib3==2.4.0
+certifi==2025.1.31
+et_xmlfile==2.0.0
+kiwisolver==1.4.7
+contourpy==1.3.0
+cycler==0.12.1
+mpmath==1.3.0
+sympy==1.13.3
+yarl==1.19.0
+multidict==6.4.3
+aiohttp==3.11.16
+aiohappyeyeballs==2.6.1
+aiosignal==1.3.2
+async-timeout==5.0.1
+importlib_resources==6.5.2
+propcache==0.3.1
+distro==1.9.0
+openai==1.75.0
+roboflow==1.1.61
+typing-inspection==0.4.0
+six==1.17.0
+requests-toolbelt==1.0.0
+Jinja2==3.1.6
+MarkupSafe==3.0.2
+python-dateutil==2.9.0.post0
+pytz==2025.2
+zipp==3.21.0
+ultralytics==8.3.118
+# --- MLflow (client; we also log from inside the container) ---
+mlflow==2.16.2
