@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from backend.api import manga_routes, review_routes
+from backend.api import manga_routes, review_routes, job_routes
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -10,6 +10,7 @@ app = FastAPI()
 # Routers
 app.include_router(manga_routes.router)
 app.include_router(review_routes.router)
+app.include_router(job_routes.router)
 
 # CORS
 app.add_middleware(

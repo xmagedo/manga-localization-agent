@@ -81,3 +81,6 @@ zipp==3.21.0
 ultralytics==8.3.118
 # --- MLflow (client; we also log from inside the container) ---
 mlflow==2.16.2
+
+# --- CROO Agent SDK (provider integration; pulls in websockets) ---
+croo-sdk==0.2.1
