@@ -31,6 +31,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import signal
 from pathlib import Path
 
@@ -84,45 +85,98 @@ def build_client() -> AgentClient:
     return AgentClient(config, os.environ["CROO_SDK_KEY"])
 
 
-def _resolve_image_path(negotiation) -> Path:
-    """Figure out which image to localize from a negotiation's requirements.
+# Matches an http(s) URL; stops at whitespace, quotes, or common JSON/markup delims.
+_URL_RE = re.compile(r"""https?://[^\s"'<>\\)\]}]+""", re.IGNORECASE)
+_IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff")
 
-    Supported requirement shapes (JSON string or dict):
-      {"image_url": "https://..."}   -> downloaded to backend/data/input
-      {"image": "https://..."}        -> downloaded
-      {"image_object_key": "..."}     -> (caller may resolve via get_download_url)
-      {"image_path": "/local/path"}   -> used directly if it exists
+
+def _coerce(obj):
+    """If obj is a JSON string (object/array/quoted), parse it; else return as-is."""
+    if isinstance(obj, str):
+        s = obj.strip()
+        if s[:1] in ("{", "[", '"'):
+            try:
+                return json.loads(s)
+            except Exception:
+                return obj
+    return obj
+
+
+def _iter_strings(obj):
+    """Yield every string found anywhere inside nested dicts/lists/tuples."""
+    obj = _coerce(obj)
+    if isinstance(obj, str):
+        yield obj
+    elif isinstance(obj, dict):
+        for v in obj.values():
+            yield from _iter_strings(v)
+    elif isinstance(obj, (list, tuple, set)):
+        for v in obj:
+            yield from _iter_strings(v)
+
+
+def _find_image_url(*candidates):
+    """Search any number of (possibly nested/JSON) structures for an http(s)
+    URL. Prefer one that looks like an image; otherwise return the first URL.
+    """
+    urls = []
+    for c in candidates:
+        for s in _iter_strings(c):
+            urls.extend(_URL_RE.findall(s))
+    # strip trailing punctuation the regex might capture
+    urls = [u.rstrip(".,;'\"") for u in urls if u]
+    for u in urls:
+        if u.split("?")[0].lower().endswith(_IMAGE_EXTS):
+            return u
+    return urls[0] if urls else None
+
+
+def _download_to_input(url: str) -> Path:
+    import requests  # already a project dependency
+
+    url = url.strip()
+    fname = Path(url.split("?")[0]).name or "order_input.png"
+    dest = INPUT_DIR / fname
+    resp = requests.get(url, timeout=30)
+    resp.raise_for_status()
+    dest.write_bytes(resp.content)
+    log.info("Downloaded order input image to %s", dest)
+    return dest
+
+
+def _resolve_image_path(negotiation) -> Path:
+    """Figure out which image to localize from a negotiation.
+
+    Robust extraction: accepts a bare URL, a named field, OR an http(s) image
+    URL found anywhere inside the (possibly nested / JSON-encoded) requirements
+    or metadata. Also honours a local {"image_path": ...}.
     Raises ValueError if no usable image reference is found.
     """
-    req = getattr(negotiation, "requirements", None)
-    if isinstance(req, str):
-        try:
-            req = json.loads(req)
-        except Exception:
-            req = {"_raw": req}
-    req = req or {}
+    req_raw = getattr(negotiation, "requirements", None)
+    meta_raw = getattr(negotiation, "metadata", None)
 
-    # direct local path
-    local = req.get("image_path")
-    if local and Path(local).exists():
-        return Path(local)
+    data = _coerce(req_raw)
+    if isinstance(data, dict):
+        # direct local path
+        local = data.get("image_path")
+        if local and Path(local).exists():
+            return Path(local)
+        # preferred named fields. CROO puts the URL under "text".
+        for key in ("text", "image_url", "image", "url", "input", "content", "data"):
+            found = _find_image_url(data.get(key))
+            if found:
+                return _download_to_input(found)
 
-    # downloadable URL
-    url = req.get("image_url") or req.get("image") or req.get("url")
-    if isinstance(url, str) and url.startswith(("http://", "https://")):
-        import requests  # already a project dependency
-
-        fname = Path(url.split("?")[0]).name or "order_input.png"
-        dest = INPUT_DIR / fname
-        resp = requests.get(url, timeout=30)
-        resp.raise_for_status()
-        dest.write_bytes(resp.content)
-        log.info("Downloaded order input image to %s", dest)
-        return dest
+    # fallback: scan every string value anywhere in requirements, then metadata,
+    # for anything that looks like an http(s) URL.
+    url = _find_image_url(req_raw) or _find_image_url(meta_raw)
+    if url:
+        return _download_to_input(url)
 
     raise ValueError(
-        "Could not find an image reference in negotiation.requirements "
-        "(expected one of: image_url, image, image_path)."
+        "Could not find an image reference in negotiation. "
+        f"requirements={type(req_raw).__name__}:{req_raw!r} "
+        f"metadata={type(meta_raw).__name__}:{meta_raw!r}"
     )
 
 
@@ -237,6 +291,11 @@ def main() -> int:
     parser.add_argument("--check", action="store_true",
                         help="Validate env vars + construct the client, then exit "
                              "(no WebSocket connect, no Online, no transaction).")
+    parser.add_argument("--deliver", metavar="ORDER_ID",
+                        help="Fulfil and deliver a single ALREADY-PAID order by id, "
+                             "then exit. Uses the existing escrow -- no new payment. "
+                             "Use this to deliver an order whose ORDER_PAID event was "
+                             "missed (e.g. it failed the first time).")
     args = parser.parse_args()
 
     if args.check:
@@ -248,6 +307,17 @@ def main() -> int:
         print(f"  CROO_SDK_KEY = present (length {len(key)}, not shown)")
         print(f"  BASE_RPC_URL = {os.getenv('BASE_RPC_URL', '(unset)')}")
         print("  client constructed; NOT connecting (use no flag to go Online).")
+        return 0
+
+    if args.deliver:
+        async def _deliver_one() -> None:
+            client = build_client()
+            try:
+                log.info("Manual delivery for already-paid order %s ...", args.deliver)
+                await _fulfill(client, args.deliver)
+            finally:
+                await client.close()
+        asyncio.run(_deliver_one())
         return 0
 
     live = _live_enabled(args.live)
