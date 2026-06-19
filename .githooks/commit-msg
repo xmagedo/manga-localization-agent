@@ -1,0 +1,6 @@
+#!/bin/sh
+# Strip any "Co-authored-by: Claude" trailer (any casing) from commit messages.
+# Other co-authors are left untouched. Enabled via: git config core.hooksPath .githooks
+msg_file="$1"
+grep -viE '^[[:space:]]*Co-authored-by:.*claude' "$msg_file" > "$msg_file.tmp" \
+  && mv "$msg_file.tmp" "$msg_file"
