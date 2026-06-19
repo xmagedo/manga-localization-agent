@@ -43,7 +43,7 @@ The provider loop ([`backend/croo/provider.py`](backend/croo/provider.py)) makes
 
 **Key SDK methods used:** `connect_websocket`, `accept_negotiation`, `get_order` / `get_negotiation`, `upload_file`, `get_download_url`, `deliver_order`.
 
-A sample manga page is committed for stable order testing: paste this into an order's **Requirements** box —
+A sample manga page is committed to the repo for stable order testing: paste this into an order's **Requirements** box —
 
 ```
 https://raw.githubusercontent.com/xmagedo/manga-localization-agent/main/examples/sample_manga.png
