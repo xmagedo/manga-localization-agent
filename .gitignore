@@ -47,6 +47,9 @@ outputs/
 # Exception: the one committed sample page used as a stable URL for CROO order testing.
 !examples/
 !examples/sample_manga.png
+# Exception: the README architecture diagram.
+!docs/
+!docs/architecture.png
 
 # ---------- MLOps / experiment tracking (out of scope for this repo) ----------
 mlruns/
