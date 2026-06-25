@@ -137,7 +137,13 @@ def _download_to_input(url: str) -> Path:
     url = url.strip()
     fname = Path(url.split("?")[0]).name or "order_input.png"
     dest = INPUT_DIR / fname
-    resp = requests.get(url, timeout=30)
+    # Browser-like headers so hosts that block bots (e.g. catbox) still serve the image.
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+        "Accept": "image/*",
+    }
+    resp = requests.get(url, timeout=30, headers=headers)
     resp.raise_for_status()
     dest.write_bytes(resp.content)
     log.info("Downloaded order input image to %s", dest)
